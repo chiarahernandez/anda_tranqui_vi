@@ -1,0 +1,72 @@
+name: anda_tranqui
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.7.0 <4.0.0'
+
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_map: ^8.1.1
+  latlong2: ^0.9.0
+  flutter_map_location_marker: ^10.1.0
+  geolocator: ^14.0.1
+  location: ^8.0.0
+  http: ^1.4.0
+  flutter_polyline_points: ^2.1.0
+  google_fonts: 6.1.0
+  flutter_rating_bar: ^4.0.0 
+  font_awesome_flutter: ^10.7.0 
+  image_picker: ^1.0.7 
+  flutter_svg: ^2.0.7
+  intl: ^0.19.0
+  supabase_flutter: 2.9.1
+  
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_native_splash: ^2.3.10
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo_andatranqui_vec.svg
+
+flutter_native_splash:
+  # color de fondo
+  color: "#4A949A"
+  # imagen centrada (tu logo)
+  image: assets/logo12.png
+  # plataformas
+  android: true
+  ios: true
+  # ocupa toda la pantalla, sin barras de estado
+  fullscreen: true
+  android_12:
+    # mismo color de fondo
+    color: "#4A949A"
+    # misma imagen (se recorta a círculo centrado)
+    image: assets/logo12.png 
+
+
+flutter_icons:               
+  android: true
+  ios: true
+
+  # Imagen "legacy" para versiones < Android 8 / iOS
+  image_path: "assets/logo12.png"
+
+  # Para ícono adaptativo Android 8+
+  adaptive_icon_background: "#4A949A"
+  adaptive_icon_foreground: "assets/logo12.png"
+
+  # Evita transparencias en iOS
+  remove_alpha_ios: true
+
+
