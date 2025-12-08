@@ -9,6 +9,9 @@ import 'imagen_dinamica.dart';
 import '../../../../servicios/api_service.dart';
 import '../alertas.dart';
 import '../../../servicios/log_etiquetas.dart';
+import 'package:flutter/foundation.dart'; 
+import '../../../../servicios/image_processor.dart'; 
+
 
 class SeccionCalificar extends StatefulWidget {
   const SeccionCalificar({
@@ -64,15 +67,30 @@ class _SeccionCalificarState extends State<SeccionCalificar> {
   }
 
   try {
-    await ApiService().subirCalificacionConImagenes(
-      idSitio: widget.idSitio,
-      estrellas: estrellasSeleccionadas,
-      imagenes: imagenesSubidas,
+
+    List<Uint8List> listaDeBytesProcesados = [];
+    
+    // se procesan las imágenes en paralelo si existen
+    if (imagenesSubidas.isNotEmpty) {
+      //creamos una lista de tareas (Futures), una por cada imagen.
+      // cada 'compute' lanza un Isolate.
+      final List<Future<Uint8List>> tareasDeProcesamiento = imagenesSubidas.map((file) {
+        return compute(procesarYComprimirImagen, file);
+      }).toList();
+      
+      listaDeBytesProcesados = await Future.wait(tareasDeProcesamiento);
+    }
+    
+    // llamamos al servicio API para subir la calificación y las imágenes.
+    await ApiService().subirCalificacionConImagenes( 
+    idSitio: widget.idSitio,
+    estrellas: estrellasSeleccionadas,
+    imagenesBytes: listaDeBytesProcesados, 
     );
 
-    //await Future.delayed(const Duration(seconds: 2)); 
+   await Future.delayed(const Duration(seconds: 2)); 
 
-    if (!mounted) return;
+   if (!mounted) return;
 
     showDialog(
       context: context,

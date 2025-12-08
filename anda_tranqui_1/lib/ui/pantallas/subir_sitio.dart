@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../servicios/api_service.dart';
 import 'package:latlong2/latlong.dart';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 
 import '../widgets/campo_tipo_sitio.dart';
 import '../widgets/campo_nombre.dart';
@@ -18,6 +20,9 @@ import '../widgets/alertas.dart';
 import 'selector_ubicacion.dart';
 import '../widgets/boton_ubicacion.dart';
 import '../widgets/seccion_calificar/imagen_dinamica.dart';
+
+import '../../../../servicios/image_processor.dart';
+
 class SubirSitioScreen extends StatefulWidget {
   final LatLng ubicacion;
 
@@ -39,29 +44,22 @@ class _SubirSitioScreenState extends State<SubirSitioScreen> {
   bool esGratis = true;
   bool esAdaptado = false;
   String? detalle;
-  late LatLng _ubicacionElegida; //guarda las coordenadas de la ubicacion elegida
-  //late porque no podés inicializar _ubicacionElegida directamente al declararla, ya que necesitás acceder a widget.ubicacion para obtener su valor inicial, y eso no está disponible hasta que se ejecuta initState()
-  //widget es una propiedad especial de los StatefulWidgets.
-  //Dart no permite acceder a widget dentro del constructor del State, ni en el momento de la declaración de las variables.
-  //Pero sí está accesible en initState() porque ahí el widget ya está montado correctamente.
-  //Voy a declarar esta variable sin valor ahora, pero la voy a completar apenas el widget se inicialice, en initState()
-  List<File> imagenesSubidas = []; //para guardar imagenes que suba
+  late LatLng _ubicacionElegida;
+  List<File> imagenesSubidas = [];
 
   @override
-  void initState() { // initstate Es un método del ciclo de vida de un StatefulWidget. Se ejecuta una sola vez, cuando se construye el widget por primera vez.
+  void initState() {
     super.initState();
-    _ubicacionElegida = widget.ubicacion; // por defecto la que le paso
-    
+    _ubicacionElegida = widget.ubicacion;
   }
 
-  //arma la lista de archivos
   void agregarImagen(String path) {
     setState(() {
       imagenesSubidas.add(File(path));
     });
   }
 
-  void _guardar() async {
+  Future<void> _guardar() async {
     final sitio = {
       'id_tipo_sitio': tipoSitioId,
       'nombre': nombre,
@@ -79,8 +77,21 @@ class _SubirSitioScreenState extends State<SubirSitioScreen> {
     };
 
     try {
-      await ApiService().subirSitio(sitio, imagenes: imagenesSubidas); //ahora le paso las imagenes ademas del sitio
-      //alertas
+      List<Uint8List> listaDeBytesProcesados = [];
+
+      if (imagenesSubidas.isNotEmpty) {
+        final tareas = imagenesSubidas.map(
+          (file) => compute(procesarYComprimirImagen, file),
+        );
+
+        listaDeBytesProcesados = await Future.wait(tareas.toList());
+      }
+
+      await ApiService().subirSitio(
+        sitio,
+        imagenesBytes: listaDeBytesProcesados,
+      );
+
       if (!mounted) return;
       showDialog(
         context: context,
@@ -101,6 +112,7 @@ class _SubirSitioScreenState extends State<SubirSitioScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -129,67 +141,52 @@ class _SubirSitioScreenState extends State<SubirSitioScreen> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        centerTitle: false,
-        title: Padding(
-          padding: const EdgeInsets.only(left: 8),
-          child: Text(
-            'Subir nuevo Sitio',
-            style: GoogleFonts.rubik(
-              color: Colors.black,
-              fontSize: 30,
-              fontWeight: FontWeight.bold,
-            ),
+        title: Text(
+          'Subir nuevo Sitio',
+          style: GoogleFonts.rubik(
+            color: Colors.black,
+            fontSize: 30,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ),
-      body: SingleChildScrollView( //creo que esto tiene una forma demasiado pesima de poner padding, los cuadrado esos sizedbox, no tiene pinta de ser muy óptimo
+      body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Tipo de Sitio
             CampoTipoSitio(
               valorSeleccionado: tipoSitioId,
               onChanged: (val) => setState(() => tipoSitioId = val),
             ),
-
             const SizedBox(height: 24),
-
-            // Nombre
             CampoNombre(
               valorInicial: nombre,
               onChanged: (val) => setState(() => nombre = val),
             ),
-
             const SizedBox(height: 24),
-            //ubicación
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30),
               child: BotonUbicacion(
-                onPressed: () async { //cuando lo clickean,,,  async porque adentro se espera el resultado de otra pantalla
-
-                //no se si esto hay q ponerlo en las rutas en el main(?)
-                  final nuevaUbicacion = await Navigator.push( //va a guardar la nueva ubicacion pero espera el resultado de la pantalla
+                onPressed: () async {
+                  final nuevaUbicacion = await Navigator.push(
                     context,
-                    MaterialPageRoute( //transición
-                      builder: (context) => SelectorUbicacionScreen( //construye la pnatalla
-                        ubicacionInicial: _ubicacionElegida, //la pantalla recibe la ubicacion actual para poner por default
+                    MaterialPageRoute(
+                      builder: (context) => SelectorUbicacionScreen(
+                        ubicacionInicial: _ubicacionElegida,
                       ),
                     ),
                   );
 
-                  if (nuevaUbicacion != null && mounted) { //si hay ubicación
+                  if (nuevaUbicacion != null && mounted) {
                     setState(() {
-                      _ubicacionElegida = nuevaUbicacion; //se reemplaza la anterior
+                      _ubicacionElegida = nuevaUbicacion;
                     });
                   }
                 },
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // Switches
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30),
               child: Row(
@@ -208,36 +205,24 @@ class _SubirSitioScreenState extends State<SubirSitioScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // Horario
             CampoHorario(
               titulo: 'Horario de atención',
               onChanged: (map) => setState(() => horarios = map),
             ),
-
             const SizedBox(height: 24),
-
-            // Tipo de Lugar
             CampoTipoLugar(
               valores: const [1, 2, 3, 4],
               etiquetas: const ['Espacio Público', 'Tienda', 'Café', 'Gasolinera'],
               valorSeleccionado: tipoLugarId,
               onChanged: (val) => setState(() => tipoLugarId = val),
             ),
-
             const SizedBox(height: 24),
-
-            // Limpieza
-             CampoLimpieza(
+            CampoLimpieza(
               valorSeleccionado: limpieza,
               onChanged: (val) => setState(() => limpieza = val),
             ),
-
             const SizedBox(height: 24),
-
-            // Precio y métodos si NO es gratis
             if (!esGratis) ...[
               CampoPrecioWidget(
                 valorInicial: precio,
@@ -250,17 +235,12 @@ class _SubirSitioScreenState extends State<SubirSitioScreen> {
               ),
               const SizedBox(height: 24),
             ],
-
-            // Detalles
             CampoDetalle(
               maxLength: 300,
               valorInicial: detalle,
               onChanged: (val) => setState(() => detalle = val),
             ),
-
             const SizedBox(height: 32),
-
-            // Imágenes 
             Padding(
               padding: const EdgeInsets.only(left: 30),
               child: SingleChildScrollView(
@@ -269,12 +249,12 @@ class _SubirSitioScreenState extends State<SubirSitioScreen> {
                   children: [
                     ...imagenesSubidas.map(
                       (file) => Padding(
-                        padding: const EdgeInsets.only(right: 20.0),
+                        padding: const EdgeInsets.only(right: 20),
                         child: ImagenDinamica(imagenUrl: file.path),
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(right: 20.0),
+                      padding: const EdgeInsets.only(right: 20),
                       child: ImagenDinamica(
                         onImagenSeleccionada: (archivo) {
                           agregarImagen(archivo.path);
@@ -285,10 +265,7 @@ class _SubirSitioScreenState extends State<SubirSitioScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 24),
-
-            // Botón enviar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30),
               child: BotonEnviar(
