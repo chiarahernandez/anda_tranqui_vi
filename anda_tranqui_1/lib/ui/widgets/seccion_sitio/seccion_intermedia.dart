@@ -4,6 +4,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:anda_tranqui/ui/widgets/seccion_sitio/info_horario.dart';
 import 'package:anda_tranqui/ui/widgets/seccion_sitio/seccion_sitio.dart';
 import 'package:anda_tranqui/servicios/formateo.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
 
 class SitioSheet extends StatelessWidget {
   final Map<String, dynamic> sitio;
@@ -23,13 +25,10 @@ class SitioSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String baseUrl = 'https://hqlcitdxmxjwmodyvihh.supabase.co/storage/v1/object/public/imagenes';
-
-    final List<String> imagenesRelativas = List<String>.from(sitio['imagenes'] ?? []);
-    final List<String> imagenes = imagenesRelativas.map((path) {
-      String cleanPath = path.startsWith('/') ? path.substring(1) : path;
-      return '$baseUrl/$cleanPath';
-    }).toList();
+    final List<String> imagenes = (sitio['imagenes'] as List?)?.whereType<String>().toList() ?? [];
+     for (final img in imagenes) {
+    precacheImage(CachedNetworkImageProvider(img), context);
+  }
 
     final rating = parseRating(sitio['promedio_estrellas']);
     final idTipoSitio = sitio['id_tipo_sitio'] ?? 0;
@@ -75,6 +74,8 @@ class SitioSheet extends StatelessWidget {
         'end': parseTime(sitio['domingo_fin']),
       },
     };
+
+    
 
     return SeccionSitio(
       scrollController: scrollController,

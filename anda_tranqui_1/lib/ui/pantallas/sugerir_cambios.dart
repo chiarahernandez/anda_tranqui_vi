@@ -50,7 +50,7 @@ class _SugerirCambiosScreenState extends State<SugerirCambiosScreen> {
     'id_tipo_sitio': widget.idTipoSitio,
     'id_tipo_lugar': tipoLugarId,
     'id_limpieza': limpieza,
-    'id_disponibilidad': disponibilidad, // ⚠️ revisá si es ID o texto
+    'id_disponibilidad': disponibilidad, 
     'precio': esGratis ? null : precio,
     'metodos_pago': metodosPago,
     'gratis': esGratis,

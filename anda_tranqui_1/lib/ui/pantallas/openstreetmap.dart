@@ -127,8 +127,8 @@ class _OpenstreetmapScreenState extends State<OpenstreetmapScreen> {
 
     if (sitio != null) {
       final etiquetas = generarEtiquetas(
-        gratis: sitio['gratis'] == true,
-        adaptable: sitio['adaptable'] == true,
+        gratis: sitio['gratis'] == 1,
+        adaptable: sitio['adaptable'] == 1,
         limpiezaTexto: sitio['limpieza'] ?? 'Sin datos',
       );
       final distancia =

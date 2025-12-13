@@ -81,7 +81,7 @@ class _SubirSitioScreenState extends State<SubirSitioScreen> {
 
       if (imagenesSubidas.isNotEmpty) {
         final tareas = imagenesSubidas.map(
-          (file) => compute(procesarYComprimirImagen, file),
+          (file) => compute(procesarYComprimirImagen, file), // <--- ESTO PUEDE FALLAR
         );
 
         listaDeBytesProcesados = await Future.wait(tareas.toList());

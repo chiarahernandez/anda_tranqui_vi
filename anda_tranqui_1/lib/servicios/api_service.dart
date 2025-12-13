@@ -20,82 +20,94 @@ class ApiService {
     }
   }
 
-  Future<void> subirSitio(
-      Map<String, dynamic> datosSitio,
-      {List<Uint8List>? imagenesBytes}
-    ) async {
-      try {
+    Future<void> subirSitio(Map<String, dynamic> datosSitio,
+    {List<Uint8List>? imagenesBytes}
+  ) async {
+  try {
+    // 1) Crear sitio
+    final urlCrearSitio = Uri.parse('$baseUrl/sitios/');
+    final sitioRes = await http.post(
+      urlCrearSitio,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'id_tipo_sitio': datosSitio['id_tipo_sitio'],
+        'nombre': datosSitio['nombre'],
+        'latitud': datosSitio['latitud'],
+        'longitud': datosSitio['longitud'],
+        'estado': 'A',
+      }),
+    );
 
-        final urlCrearSitio = Uri.parse('$baseUrl/sitios/');
-        print('POST crear sitio → $urlCrearSitio');
-
-        final sitioRes = await http.post(
-          urlCrearSitio,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'id_tipo_sitio': datosSitio['id_tipo_sitio'],
-            'nombre': datosSitio['nombre'],
-            'latitud': datosSitio['latitud'],
-            'longitud': datosSitio['longitud'],
-            'estado': 'A',
-          }),
-        );
-
-        print('STATUS crear sitio: ${sitioRes.statusCode}');
-        print('BODY: ${sitioRes.body}');
-
-        if (sitioRes.statusCode != 201) throw Exception('Error al crear sitio');
-
-        final idSitio = jsonDecode(sitioRes.body)['id_sitio'];
-        print('✔ sitio creado con id: $idSitio');
-
-
-        final urlCrearHorario = Uri.parse('$baseUrl/horario_semanal/');
-        final horarios = datosSitio['horarios'];
-
-        final horarioRes = await http.post(
-          urlCrearHorario,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'id_sitio': idSitio,
-            ...horarios,
-          }),
-        );
-
-        if (horarioRes.statusCode != 201) throw Exception('Error al cargar horarios');
-        final idHorario = jsonDecode(horarioRes.body)['id_horario_semanal'];
-
-        final urlCrearInfoSitio = Uri.parse('$baseUrl/info_sitios/');
-
-        final infoRes = await http.post(
-          urlCrearInfoSitio,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'id_sitio': idSitio,
-            'id_horario_semanal': idHorario,
-            'descripcion': datosSitio['detalle'],
-            'gratis': datosSitio['es_gratis'],
-            'adaptable': datosSitio['es_adaptado'],
-            'precio': datosSitio['precio'],
-            'id_limpieza': datosSitio['limpieza'],
-            'id_tipo_lugar': datosSitio['id_tipo_lugar'],
-            'id_metodo': datosSitio['metodos_pago'].isNotEmpty
-                ? datosSitio['metodos_pago'][0]
-                : null,
-          }),
-        );
-
-        if (infoRes.statusCode != 201) throw Exception('Error al cargar info sitio');
-
-        if (imagenesBytes != null && imagenesBytes.isNotEmpty) {
-          await subirImagenesBytesSitio(idSitio: idSitio, imagenesBytes: imagenesBytes);
-        }
-
-        print('Sitio cargado correctamente con imágenes');
-      } catch (e) {
-        print('Error en subirSitio: $e');
-      }
+    if (sitioRes.statusCode != 201) {
+      throw Exception('Error al crear sitio: ${sitioRes.statusCode} ${sitioRes.body}');
     }
+    final idSitio = jsonDecode(sitioRes.body)['id_sitio'];
+    print('✔ sitio creado id: $idSitio');
+
+    // Crear horario semanal
+    final urlCrearHorario = Uri.parse('$baseUrl/horario_semanal/');
+    final horarios = datosSitio['horarios'] ?? {};
+    final horarioRes = await http.post(
+      urlCrearHorario,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'id_sitio': idSitio,
+        ...horarios,
+      }),
+    );
+
+    if (horarioRes.statusCode != 201) {
+      throw Exception('Error al crear horario: ${horarioRes.statusCode} ${horarioRes.body}');
+    }
+    final idHorario = jsonDecode(horarioRes.body)['id_horario_semanal'];
+    print('✔ horario creado id: $idHorario');
+
+    final urlCrearInfoSitio = Uri.parse('$baseUrl/info_sitios/');
+
+    List<dynamic>? metodosPago = datosSitio['metodos_pago'] as List<dynamic>?;
+    if (metodosPago != null) {
+      metodosPago = metodosPago.where((m) => m != null).map((m) {
+        if (m is String) return int.tryParse(m) ?? m;
+        return m;
+      }).toList();
+    }
+
+    final infoBody = {
+      'id_sitio': idSitio,
+      'id_horario_semanal': idHorario,
+      'descripcion': datosSitio['detalle'],
+      'gratis': datosSitio['es_gratis'],
+      'adaptable': datosSitio['es_adaptado'],
+      'precio': datosSitio['precio'],
+      'id_limpieza': datosSitio['limpieza'],
+      'id_tipo_lugar': datosSitio['id_tipo_lugar'],
+      if (metodosPago != null && metodosPago.isNotEmpty)
+        'id_sitio_metodo_pago': metodosPago,
+    };
+
+    final infoRes = await http.post(
+      urlCrearInfoSitio,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(infoBody),
+    );
+
+    if (infoRes.statusCode != 201) {
+      throw Exception('Error al crear info_sitio: ${infoRes.statusCode} ${infoRes.body}');
+    }
+
+    print('✔ info_sitio creada y métodos (si los enviaron)');
+
+    if (imagenesBytes != null && imagenesBytes.isNotEmpty) {
+      await subirImagenesBytesSitio(idSitio: idSitio, imagenesBytes: imagenesBytes);
+    }
+
+    print('✔ Sitio cargado exitosamente con todo.');
+
+  } catch (e) {
+    print('Error en subirSitio: $e');
+    rethrow;
+  }
+}
 
 
     Future<void> subirImagenesBytesSitio({
@@ -116,7 +128,7 @@ class ApiService {
 
         request.files.add(
           http.MultipartFile.fromBytes(
-            'imagen',  // mismo campo que backend espera
+            'imagen',  
             bytes,
             filename: fileName,
             contentType: MediaType('image', 'jpeg'),
@@ -161,78 +173,165 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>?> obtenerInfoSitioPorId(int idSitio) async {
-    final url = Uri.parse('$baseVistaUrl/$idSitio');
-    final response = await http.get(url);
+    try {
 
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> data = jsonDecode(response.body);
-      return data;
-    } else {
-      print('Error al obtener info completa del sitio $idSitio: ${response.statusCode}');
+      final urlVista = Uri.parse('$baseVistaUrl/$idSitio');
+      final vistaRes = await http.get(urlVista);
+
+      if (vistaRes.statusCode != 200) {
+        print('Error al obtener datos de la vista: ${vistaRes.statusCode} ${vistaRes.body}');
+        return null;
+      }
+
+      final Map<String, dynamic> data = jsonDecode(vistaRes.body);
+      final String? metodosString = data['metodos_pago'] as String?;
+      
+      List<String> metodosPagoNombres = (metodosString != null && metodosString.isNotEmpty)
+          ? metodosString.split(', ')
+          : [];
+   
+      final String? urlsString = data['urls_imagenes'] as String?;
+
+      List<String> imagenesUrls = [];
+
+      if (urlsString != null && urlsString.isNotEmpty) {
+        imagenesUrls = urlsString.split(',').map((urlRaw) {
+          final u = urlRaw.trim();
+
+          if (u.startsWith('http')) return u;
+
+          return 'https://anda-tranqui.s3.us-east-2.amazonaws.com/$u';
+        }).toList();
+      }
+
+      final result = {
+        ...data,
+        'imagenes': imagenesUrls, 
+        'metodos_pago': metodosPagoNombres,
+      };
+
+      return result;
+      
+    } catch (e) {
+      print('Error obtener info por id (Versión Vista): $e');
       return null;
     }
   }
 
-  Future<void> subirCalificacionConImagenes({
-        required int idSitio,
-        required int estrellas,
-        required List<Uint8List> imagenesBytes, 
-    }) async {
-        final calificacionResponse = await http.post(
-        Uri.parse('$baseUrl/calificaciones/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-        'id_sitio': idSitio,
-        'estrellas': estrellas,
-        }),
-        );
 
-      if (calificacionResponse.statusCode != 201) {
-        throw Exception('Error al guardar calificación: ${calificacionResponse.body}');
-      }
+  Future<void> subirCalificacionConImagenes({ required int idSitio, required int estrellas, List<dynamic>? metodosPago, List<Uint8List>? imagenesBytes,}) async {
+  try {
+    print('Subiendo calificación para sitio $idSitio...');
 
-      //ahora carga las imagenes usando los bytes y MultipartFile.fromBytes
-      for (final bytes in imagenesBytes) {
-      final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('$baseUrl/imagenes/'),
-      );
-      request.fields['id_sitio'] = idSitio.toString();
+    if (metodosPago != null) {
+      metodosPago = metodosPago.where((m) => m != null).map((m) {
+        if (m is String) return int.tryParse(m) ?? m;
+        return m;
+      }).toList();
+    }
 
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}-${idSitio}.jpg'; 
+    // Crear calificación
+    final urlCrearCalificacion = Uri.parse('$baseUrl/calificaciones/');
+    final calificacionBody = {
+      'id_sitio': idSitio,
+      'estrellas': estrellas,
+      if (metodosPago != null && metodosPago.isNotEmpty)
+        'id_calificacion_metodo_pago': metodosPago,
+    };
 
-      // Usamos fromBytes en lugar de fromPath
-      request.files.add(
-      http.MultipartFile.fromBytes(
-      'imagen', 
-      bytes,
-              filename: fileName, 
-              ),
-            );
-
-            final response = await request.send();
-            if (response.statusCode != 201) {
-            final error = await response.stream.bytesToString();
-            throw Exception('Error al subir una imagen: $error');
-          }
-        }
-  }
-
-  Future<void> subirSugerencia(Map<String, dynamic> sugerencia) async {
-    final url = Uri.parse('$baseUrl/sugerencias/'); 
-
-    final response = await http.post(
-      url,
-      headers: {
-        HttpHeaders.contentTypeHeader: 'application/json',
-      },
-      body: jsonEncode(sugerencia),
+    final calificacionRes = await http.post(
+      urlCrearCalificacion,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(calificacionBody),
     );
 
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Error al subir sugerencia: ${response.body}');
+    if (calificacionRes.statusCode != 201) {
+      throw Exception(
+        'Error al crear calificación: ${calificacionRes.statusCode} ${calificacionRes.body}',
+      );
     }
+
+    final idCalificacion = jsonDecode(calificacionRes.body)['id_calificacion'];
+    print('✔ Calificación creada id: $idCalificacion');
+
+    if (imagenesBytes != null && imagenesBytes.isNotEmpty) {
+      print('Subiendo ${imagenesBytes.length} imágenes...');
+
+      for (int i = 0; i < imagenesBytes.length; i++) {
+        final bytes = imagenesBytes[i];
+
+        final request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$baseUrl/imagenes/'),
+        );
+
+        request.fields['id_sitio'] = idSitio.toString();
+        request.fields['id_calificacion'] = idCalificacion.toString();
+
+        final fileName =
+            'calif-${DateTime.now().millisecondsSinceEpoch}-$i-$idSitio.jpg';
+
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'imagen',
+            bytes,
+            filename: fileName,
+            contentType: MediaType('image', 'jpeg'),
+          ),
+        );
+
+        final response = await request.send();
+        final responseBody = await response.stream.bytesToString();
+
+        print('IMG_CAL[$i] → status ${response.statusCode}, body: $responseBody');
+
+        if (response.statusCode != 201) {
+          throw Exception('Error al subir imagen: $responseBody');
+        }
+      }
+
+      print('✔ Todas las imágenes de la calificación subidas');
+    }
+
+    print('Calificación cargada con éxito (con métodos y fotos)');
+
+  } catch (err) {
+    print('Error en subirCalificacionConImagenes: $err');
+    rethrow;
   }
+}
+
+
+ Future<void> subirSugerencia(Map<String, dynamic> sugerencia) async {
+  final url = Uri.parse('$baseUrl/sugerencias/');
+
+  List<dynamic>? metodosPago = sugerencia['metodos_pago'];
+  if (metodosPago != null) {
+    metodosPago = metodosPago.where((m) => m != null).map((m) {
+      if (m is String) return int.tryParse(m) ?? m;
+      return m;
+    }).toList();
+  }
+
+  final body = {
+    ...sugerencia,
+    if (metodosPago != null && metodosPago.isNotEmpty)
+      'id_sitio_metodo_pago': metodosPago,
+  };
+
+  final response = await http.post(
+    url,
+    headers: {HttpHeaders.contentTypeHeader: 'application/json'},
+    body: jsonEncode(body),
+  );
+
+  if (response.statusCode != 200 && response.statusCode != 201) {
+    throw Exception('Error al subir sugerencia: ${response.body}');
+  }
+
+  print("✔ Sugerencia enviada con métodos (si había)");
+}
+
 
   Future<void> subirImagenesSitio({
     required int idSitio,
