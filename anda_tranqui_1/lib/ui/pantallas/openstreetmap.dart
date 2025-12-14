@@ -338,21 +338,36 @@ class _OpenstreetmapScreenState extends State<OpenstreetmapScreen> {
               ? Buscador(
                   controller: _searchController, //usa el que tengo escuchando
                   sugerencias: _sugerencias, //usa las sugerencias que tengo
-                  onSeleccionar: (sitio) { //si elige una agarra sus datos
+                  onSeleccionar: (sitio) {
                     final lat = sitio['latitud'];
                     final lng = sitio['longitud'];
                     final idSitio = sitio['id_sitio'];
                     final tipo = sitio['id_tipo_sitio'];
 
-                    _mapController.move(LatLng(lat, lng), 16.0); //mueve el mapa
-                    _cargarInfoSitioCompleta(idSitio, lat, lng, tipo); //usa la vista
+                    final destino = LatLng(lat, lng);
 
-                    setState(() { //cambia el estado, saca el buscador, limpia sugerencias y buscador
+                    setState(() {
+                      _destination = destino;        // 👈 1. setear destino
+                      _tipoRutaDestino = tipo;       // 👈 2. guardar tipo (color ruta)
+                    });
+
+                    _mapController.move(destino, 16.0);
+
+                    _fetchRoute();                   // 👈 3. calcular ruta
+                    _cargarInfoSitioCompleta(
+                      idSitio,
+                      lat,
+                      lng,
+                      tipo,
+                    );
+
+                    setState(() {
                       _mostrarBuscador = false;
                       _sugerencias = [];
                       _searchController.clear();
                     });
                   },
+
                   onCerrar: () { //si cierra el buscador limpia todo y muestra la lupa
                     setState(() {
                       _searchController.clear();
