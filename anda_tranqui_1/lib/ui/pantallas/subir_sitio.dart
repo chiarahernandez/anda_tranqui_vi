@@ -104,8 +104,8 @@ class _SubirSitioScreenState extends State<SubirSitioScreen> {
             colorIcono: const Color(0xFFB2D8C3),
             mensaje: 'Sitio cargado con éxito',
             onConfirmar: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop();
+              Navigator.of(context).pop(); // cierra el diálogo
+              Navigator.of(context).pop(true); // 👈 avisa que se creó el sitio
             },
           ),
         ),

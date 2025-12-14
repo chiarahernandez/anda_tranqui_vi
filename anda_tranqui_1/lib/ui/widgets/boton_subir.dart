@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-import '../pantallas/subir_sitio.dart'; 
+import '../pantallas/subir_sitio.dart';
 
 class BotonSubir extends StatelessWidget {
   final LatLng? ubicacion;
+  final VoidCallback? onSitioCreado;
 
-  const BotonSubir({super.key, required this.ubicacion});
+  const BotonSubir({
+    super.key,
+    required this.ubicacion,
+    this.onSitioCreado,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -17,14 +22,19 @@ class BotonSubir extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: IconButton(
-        onPressed: () {
+        onPressed: () async {
           if (ubicacion != null) {
-            Navigator.push(
+            final bool? sitioCreado = await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => SubirSitioScreen(ubicacion: ubicacion!),
+                builder: (context) =>
+                    SubirSitioScreen(ubicacion: ubicacion!),
               ),
             );
+
+            if (sitioCreado == true) {
+              onSitioCreado?.call();
+            }
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text("Ubicación no disponible")),

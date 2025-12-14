@@ -164,6 +164,7 @@ class ApiService {
                 'latitud': double.tryParse(sitio['latitud'].toString()) ?? 0.0,
                 'longitud': double.tryParse(sitio['longitud'].toString()) ?? 0.0,
                 'id_tipo_sitio': sitio['id_tipo_sitio'],
+                'nombre': sitio['nombre'] ?? 'Sin nombre',
               })
           .toList();
     } else {

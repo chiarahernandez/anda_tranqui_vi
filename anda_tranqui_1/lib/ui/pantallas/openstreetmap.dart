@@ -46,8 +46,8 @@ class _OpenstreetmapScreenState extends State<OpenstreetmapScreen> {
   void initState() {
     super.initState();
 
-    _initializelocation();
-    fetchSitios();
+    fetchSitios();          // rápido, red
+     _initializelocation();  // lento, plugin nativo
     
     //listener escucha cuando el usuario escribe algo 
   _searchController.addListener(() {
@@ -84,22 +84,64 @@ class _OpenstreetmapScreenState extends State<OpenstreetmapScreen> {
   }
 
   // Inicializa la ubicación actual del usuario y comienza a escuchar cambios en la ubicación
+ // Inicializa la ubicación actual del usuario
   Future<void> _initializelocation() async {
-    final tienePermisos = await _ubicacionService.verificarPermisos();
-    if (!tienePermisos) return;
-
-    _ubicacionService.obtenerUbicacion().listen((locationData) {
-      if (locationData.latitude != null && locationData.longitude != null) {
-        setState(() {
-          _currentLocation = LatLng(
-            locationData.latitude!,
-            locationData.longitude!,
-          );
-          isLoading = false;
-        });
+    try {
+      // 1. Verificar permisos y activar GPS
+      final tienePermisos = await _ubicacionService.verificarPermisos();
+      
+      if (!tienePermisos) {
+        debugPrint('No hay permisos o GPS apagado');
+        if (mounted) {
+          setState(() => isLoading = false);
+        }
+        return;
       }
-    });
+
+      // 2. Obtener la ubicación YA (sin esperar a moverse)
+      final locationData = await _ubicacionService.obtenerUbicacion();
+      
+      if (locationData != null && locationData.latitude != null && locationData.longitude != null) {
+        if (mounted) {
+          setState(() {
+            _currentLocation = LatLng(
+              locationData.latitude!,
+              locationData.longitude!,
+            );
+            // Opcional: Centrar el mapa apenas tenemos la ubicación
+            _mapController.move(_currentLocation!, 15.0);
+            isLoading = false; 
+          });
+        }
+      } else {
+        // Si falló la ubicación única, liberamos el loader igual
+        if (mounted) setState(() => isLoading = false);
+      }
+
+      // 3. Quedarse escuchando cambios (para cuando camines)
+      _ubicacionService.obtenerUbicacionStream().listen((locationData) {
+        if (locationData.latitude != null && locationData.longitude != null) {
+          // Solo actualizamos la variable, NO movemos la cámara a la fuerza siempre
+          // porque si el usuario está mirando otro lado es molesto que lo arrastre.
+          if (mounted) {
+            setState(() {
+              _currentLocation = LatLng(
+                locationData.latitude!,
+                locationData.longitude!,
+              );
+            });
+          }
+        }
+      });
+
+    } catch (e) {
+      debugPrint('Error inicializando ubicación: $e');
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
   }
+
 
   // Mueve el mapa a la ubicación actual del usuario
   Future<void> _userCurrentLocation() async {
@@ -180,21 +222,22 @@ class _OpenstreetmapScreenState extends State<OpenstreetmapScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          isLoading // Muestra un indicador de carga mientras se obtiene la ubicación
-              ? const Center(child: CircularProgressIndicator())
-              : FlutterMap(
+          Stack(
+            children: [
+              FlutterMap(
                 mapController: _mapController, // Controlador del mapa
                 options: MapOptions(
                   initialCenter: _currentLocation ??
                       LatLng(-32.8894, -68.8458),
                   initialZoom: 15.0,
                   onTap: (tapPosition, point) {
-                    setState(() => _sitioSeleccionado = null); //que si toca afuera se vaya, unica forma de sacar el sheet
+                    setState(() => _sitioSeleccionado = null);
+                    // que si toca afuera se vaya, única forma de sacar el sheet
                   },
                 ),
                 children: [
                   TileLayer(
-                    //capa de tiles, para renderizar
+                    // capa de tiles, para renderizar
                     urlTemplate:
                         'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.example.anda_tranqui',
@@ -209,9 +252,8 @@ class _OpenstreetmapScreenState extends State<OpenstreetmapScreen> {
                         ),
                       ),
                       markerSize: const Size(35, 35),
-                      markerDirection:
-                          MarkerDirection
-                              .heading, // Orienta el marcador según la dirección del movimiento, wtf ni sabia q pasaba
+                      markerDirection: MarkerDirection.heading,
+                      // Orienta el marcador según la dirección del movimiento
                     ),
                   ),
                   MarkerLayer(
@@ -259,6 +301,19 @@ class _OpenstreetmapScreenState extends State<OpenstreetmapScreen> {
                     ),
                 ],
               ),
+
+              // 👇 Loader superpuesto SOLO mientras se obtiene la ubicación
+              if (isLoading)
+                const Positioned.fill(
+                  child: IgnorePointer(
+                    child: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+
               //filtros
           Positioned(
             top: 40,
@@ -326,7 +381,12 @@ class _OpenstreetmapScreenState extends State<OpenstreetmapScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 BotonCentrar(onPressed: _userCurrentLocation),
-                BotonSubir(ubicacion: _currentLocation), //le paso ubicacion 
+                BotonSubir(
+                  ubicacion: _currentLocation,
+                  onSitioCreado: () async {
+                    await fetchSitios(); // 👈 RECARGA LOS SITIOS
+                  },
+                ),
               ],
             ),
           ),
