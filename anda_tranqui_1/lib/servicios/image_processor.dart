@@ -2,41 +2,36 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 
-/// Se ejecuta en isolate (compute)
 Future<Uint8List> procesarYComprimirImagen(File imagen) async {
-  // 1️⃣ Leer bytes originales
   final bytesOriginales = await imagen.readAsBytes();
+  final original = img.decodeImage(bytesOriginales);
+  if (original == null) return bytesOriginales;
 
-  // 2️⃣ Decodificar imagen
-  final imagenDecodificada = img.decodeImage(bytesOriginales);
-  if (imagenDecodificada == null) {
-    // fallback: devolver original si algo falla
-    return bytesOriginales;
-  }
+  // 1️⃣ Recorte cuadrado centrado
+  final lado = original.width < original.height
+      ? original.width
+      : original.height;
 
-  // 3️⃣ Redimensionar si es muy grande
-  const maxLado = 1600;
-  img.Image imagenFinal = imagenDecodificada;
+  final x = (original.width - lado) ~/ 2;
+  final y = (original.height - lado) ~/ 2;
 
-  if (imagenDecodificada.width > maxLado ||
-      imagenDecodificada.height > maxLado) {
-    imagenFinal = img.copyResize(
-      imagenDecodificada,
-      width: imagenDecodificada.width >= imagenDecodificada.height
-          ? maxLado
-          : null,
-      height: imagenDecodificada.height > imagenDecodificada.width
-          ? maxLado
-          : null,
-    );
-  }
-
-  // 4️⃣ Re-encode JPEG con calidad controlada
-  final bytesComprimidos = img.encodeJpg(
-    imagenFinal,
-    quality: 80, // equilibrio peso / calidad
+  final cuadrada = img.copyCrop(
+    original,
+    x: x,
+    y: y,
+    width: lado,
+    height: lado,
   );
 
-  // 5️⃣ Devolver bytes finales
-  return Uint8List.fromList(bytesComprimidos);
+  // 2️⃣ Resize final
+  final finalImg = img.copyResize(
+    cuadrada,
+    width: 1600,
+    height: 1600,
+  );
+
+  // 3️⃣ Compresión
+  final jpg = img.encodeJpg(finalImg, quality: 80);
+
+  return Uint8List.fromList(jpg);
 }
